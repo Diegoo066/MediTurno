@@ -1,5 +1,5 @@
 {
   "name": "mediturno-api", "private": true, "version": "0.1.0", "type": "module",
-  "scripts": { "dev": "node --watch src/server.js", "start": "node src/server.js", "admin:hash": "node src/create-admin-hash.js", "db:migrate": "node src/migrate.js" },
+  "scripts": { "dev": "node --watch src/server.js", "start": "node src/server.js", "admin:hash": "node src/create-admin-hash.js", "db:migrate": "node src/migrate.js", "test": "node --test src/*.test.js" },
   "dependencies": { "cors": "^2.8.5", "dotenv": "^16.4.5", "express": "^4.21.2", "mysql2": "^3.12.0" }
 }

@@ -1,5 +1,15 @@
 # MediTurno
 
+En una instalacion nueva, `database\\schema.sql` crea tambien una agenda demo inicial. En bases existentes, `npm.cmd run db:migrate` aplica solo cambios de estructura y no recrea horarios eliminados intencionalmente.
+
+## Estado y limitaciones actuales
+
+La aplicación registra solicitudes de cita y muestra su estado en el panel administrativo. Actualmente no existe un servicio de correo, SMS, recuperación de contraseña, registro de pacientes ni notificaciones; por eso la interfaz no promete revisar ni enviar correos después de una reserva.
+
+El rate limiting del acceso administrativo es local al proceso Node.js: protege el desarrollo y una instancia única, pero para varias instancias debe trasladarse a un almacén compartido como Redis. La protección CSRF valida `Origin` y `Referer` en login, logout y operaciones administrativas, y permite los orígenes locales configurados (`127.0.0.1` y `localhost`).
+
+Las fechas administrativas, filtros y gráficos se interpretan en `America/Lima`; la base de datos almacena las reservas en UTC. Los totales de las tarjetas son generales y no cambian al filtrar la tabla; el gráfico y la tabla sí reflejan los filtros activos.
+
 MediTurno es una aplicación full stack para consultar médicos y solicitar citas médicas. Incluye una landing pública con disponibilidad real de horarios y un panel administrativo protegido para gestionar reservas.
 
 > Proyecto personal de aprendizaje. No incluye datos de pacientes, credenciales ni secretos. Los médicos incluidos en el esquema son registros de demostración.
@@ -138,6 +148,24 @@ Build del frontend:
 ```powershell
 cd frontend
 npm.cmd run build
+```
+
+Pruebas automatizadas ligeras del backend:
+
+```powershell
+cd backend
+npm.cmd test
+```
+
+Estas pruebas cubren el rate limiter en memoria. Las pruebas de autenticacion completa y conflictos de reserva requieren un MySQL local y deben ejecutarse con datos de prueba, cancelando las citas creadas al finalizar.
+
+La prueba de integracion opcional se activa sin guardar secretos en el repositorio:
+
+```powershell
+$env:TEST_API_BASE_URL='http://127.0.0.1:3001'
+$env:TEST_ADMIN_EMAIL='administrador-de-prueba'
+$env:TEST_ADMIN_PASSWORD='contraseña-de-prueba'
+npm.cmd test
 ```
 
 Comprobaciones recomendadas:

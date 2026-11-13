@@ -43,3 +43,14 @@ WHERE NOT EXISTS (SELECT 1 FROM doctors WHERE full_name='Dr. Martín Rojas');
 INSERT INTO doctors (full_name, specialty, city)
 SELECT 'Dra. Lucía Salazar', 'Pediatría', 'Lima'
 WHERE NOT EXISTS (SELECT 1 FROM doctors WHERE full_name='Dra. Lucía Salazar');
+
+-- Datos de agenda únicamente para una instalación inicial. Las migraciones no
+-- vuelven a crear horarios que un administrador haya eliminado.
+INSERT INTO doctor_availability (doctor_id, weekday, start_time, end_time, timezone, active)
+SELECT d.id, weekdays.weekday, '08:00:00', '17:00:00', 'America/Lima', TRUE
+FROM doctors d
+JOIN (
+  SELECT 0 AS weekday UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL
+  SELECT 3 UNION ALL SELECT 4
+) weekdays
+WHERE NOT EXISTS (SELECT 1 FROM doctor_availability existing WHERE existing.doctor_id = d.id);

@@ -61,7 +61,7 @@ function App() {
       const response = await fetch('/api/appointments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ doctorId: selected.id, patientName: values.patientName, patientEmail: values.patientEmail, startsAt: new Date(values.startsAt).toISOString() }) });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || 'Error al registrar la cita.');
-      setSelected(null); setValues(emptyValues); setNotice({ type: 'success', message: 'Tu solicitud fue registrada. Revisa tu correo para los siguientes pasos.' });
+      setSelected(null); setValues(emptyValues); setNotice({ type: 'success', message: 'Tu solicitud fue registrada correctamente.' });
       document.getElementById('especialistas')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (error) { setBookingNotice({ type: 'error', message: error instanceof TypeError ? 'No se pudo conectar con el servidor. Verifica que backend y frontend estén encendidos.' : error.message }); }
     finally { setSending(false); }

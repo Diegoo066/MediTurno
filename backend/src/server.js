@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import mysql from 'mysql2/promise';
 import crypto from 'node:crypto';
+import { createLoginRateLimiter } from './security.js';
 
 const app = express();
 const frontendOrigin = process.env.FRONTEND_ORIGIN || 'http://127.0.0.1:5173';
@@ -10,8 +11,10 @@ const sessionMaxAgeMs = 8 * 60 * 60 * 1000;
 const sessionCookie = 'mediturno_admin';
 const APP_TIME_ZONE = 'America/Lima';
 const SLOT_MINUTES = 30;
+const allowedOrigins = new Set([frontendOrigin, ...(process.env.NODE_ENV === 'production' ? [] : ['http://127.0.0.1:5173', 'http://localhost:5173'])]);
+const loginRateLimiter = createLoginRateLimiter();
 
-app.use(cors({ origin: frontendOrigin, credentials: true }));
+app.use(cors({ origin: (origin, callback) => callback(null, !origin || allowedOrigins.has(origin)), credentials: true }));
 app.use(express.json({ limit: '20kb' }));
 
 const db = mysql.createPool({
@@ -98,6 +101,14 @@ function setSessionCookie(res, token) {
   res.setHeader('Set-Cookie', `${sessionCookie}=${encodeURIComponent(token)}; Max-Age=${sessionMaxAgeMs / 1000}; Path=/; HttpOnly; SameSite=Lax${secure}`);
 }
 function clearSessionCookie(res) { res.setHeader('Set-Cookie', `${sessionCookie}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax`); }
+function requireTrustedOrigin(req, res, next) {
+  const origin = req.get('origin');
+  const referer = req.get('referer');
+  let refererOrigin = null;
+  try { refererOrigin = referer ? new URL(referer).origin : null; } catch { refererOrigin = 'invalid'; }
+  if ((origin && !allowedOrigins.has(origin)) || (!origin && referer && !allowedOrigins.has(refererOrigin))) return res.status(403).json({ error: 'Origen no permitido.' });
+  next();
+}
 
 app.get('/api/health', async (_req, res) => {
   try { await db.query('SELECT 1'); res.json({ status: 'ok', database: 'connected' }); }
@@ -170,19 +181,23 @@ app.post('/api/appointments', async (req, res, next) => {
   } finally { connection?.release(); }
 });
 
-app.post('/api/admin/login', async (req, res, next) => {
+app.post('/api/admin/login', requireTrustedOrigin, async (req, res, next) => {
   try {
     const email = String(req.body?.email || '').trim().toLowerCase();
     const password = String(req.body?.password || '');
+    const attemptKey = `${req.ip}:${email || '<missing>'}`;
+    const rate = loginRateLimiter.check(attemptKey);
+    if (!rate.allowed) { res.setHeader('Retry-After', rate.retryAfterSeconds); return res.status(429).json({ error: 'Demasiados intentos. Espera unos minutos antes de volver a intentarlo.' }); }
     const configuredEmail = String(process.env.ADMIN_EMAIL || '').trim().toLowerCase();
     if (!configuredEmail || !process.env.ADMIN_PASSWORD_HASH || !process.env.AUTH_SECRET) return res.status(503).json({ error: 'El administrador no está configurado en backend/.env.' });
     const valid = email === configuredEmail && password.length > 0 && await verifyPassword(password, process.env.ADMIN_PASSWORD_HASH);
-    if (!valid) return res.status(401).json({ error: 'Correo o contraseña incorrectos.' });
+    if (!valid) { loginRateLimiter.registerFailure(attemptKey); return res.status(401).json({ error: 'Correo o contraseña incorrectos.' }); }
+    loginRateLimiter.reset(attemptKey);
     setSessionCookie(res, signSession({ sub: email, role: 'admin', exp: Date.now() + sessionMaxAgeMs }));
     res.json({ email, role: 'admin' });
   } catch (error) { next(error); }
 });
-app.post('/api/admin/logout', (_req, res) => { clearSessionCookie(res); res.status(204).end(); });
+app.post('/api/admin/logout', requireTrustedOrigin, (_req, res) => { clearSessionCookie(res); res.status(204).end(); });
 app.get('/api/admin/session', requireAdmin, (req, res) => res.json({ email: req.admin.sub, role: req.admin.role }));
 
 app.get('/api/admin/doctors', requireAdmin, async (_req, res, next) => {
@@ -199,7 +214,7 @@ app.get('/api/admin/doctors/:doctorId/availability', requireAdmin, async (req, r
   } catch (error) { next(error); }
 });
 
-app.put('/api/admin/doctors/:doctorId/availability', requireAdmin, async (req, res, next) => {
+app.put('/api/admin/doctors/:doctorId/availability', requireTrustedOrigin, requireAdmin, async (req, res, next) => {
   let connection;
   try {
     const doctorId = Number(req.params.doctorId);
@@ -234,7 +249,14 @@ app.get('/api/admin/appointments', requireAdmin, async (req, res, next) => {
     const search = String(req.query.search || '').trim().slice(0, 80); const doctorId = String(req.query.doctorId || '').trim(); const date = String(req.query.date || '').trim(); const status = String(req.query.status || '').trim();
     if (search) { clauses.push('(a.patient_name LIKE ? OR a.patient_email LIKE ?)'); values.push(`%${search}%`, `%${search}%`); }
     if (/^\d+$/.test(doctorId)) { clauses.push('a.doctor_id = ?'); values.push(Number(doctorId)); }
-    if (/^\d{4}-\d{2}-\d{2}$/.test(date)) { clauses.push('DATE(a.starts_at) = ?'); values.push(date); }
+    if (date) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'La fecha del filtro no es válida.' });
+      const start = localDateTimeToUtc(date, '00:00');
+      const nextDate = new Date(start?.getTime() || NaN);
+      if (!start || getLocalDateTime(start).date !== date) return res.status(400).json({ error: 'La fecha del filtro no es válida en America/Lima.' });
+      nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+      clauses.push('a.starts_at >= ? AND a.starts_at < ?'); values.push(formatSlotKey(start), formatSlotKey(nextDate));
+    }
     if (['scheduled', 'confirmed', 'cancelled'].includes(status)) { clauses.push('a.status = ?'); values.push(status); }
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
     const [rows] = await db.execute(`SELECT a.id, a.patient_name, a.patient_email, a.starts_at, a.status, d.id AS doctor_id, d.full_name AS doctor_name, d.specialty FROM appointments a INNER JOIN doctors d ON d.id = a.doctor_id ${where} ORDER BY a.starts_at DESC, a.id DESC`, values);
@@ -242,7 +264,7 @@ app.get('/api/admin/appointments', requireAdmin, async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
-app.patch('/api/admin/appointments/:id/status', requireAdmin, async (req, res, next) => {
+app.patch('/api/admin/appointments/:id/status', requireTrustedOrigin, requireAdmin, async (req, res, next) => {
   let connection;
   try {
     const id = Number(req.params.id); const status = String(req.body?.status || '');

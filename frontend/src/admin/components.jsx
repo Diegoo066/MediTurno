@@ -36,19 +36,28 @@ export function StatCard({ label, value, tone, icon }) {
   return <article className={`mt-stat-card ${tone}`}><span className="mt-stat-icon"><Icon name={icon} size={22} /></span><div><span className="mt-stat-label">{label}</span><strong>{value}</strong></div></article>;
 }
 
+const APP_TIME_ZONE = 'America/Lima';
+
+function limaDateKey(value = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: APP_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(value));
+  const values = Object.fromEntries(parts.filter(part => part.type !== 'literal').map(part => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 function chartDays(range) {
   const days = [];
-  const today = new Date();
+  const [year, month, day] = limaDateKey().split('-').map(Number);
+  const today = new Date(Date.UTC(year, month - 1, day, 12));
   for (let offset = range - 1; offset >= 0; offset -= 1) {
-    const date = new Date(today); date.setHours(12, 0, 0, 0); date.setDate(today.getDate() - offset);
-    days.push({ key: date.toISOString().slice(0, 10), label: new Intl.DateTimeFormat('es-PE', { weekday: 'short' }).format(date).replace('.', '') });
+    const date = new Date(today); date.setUTCDate(today.getUTCDate() - offset);
+    days.push({ key: date.toISOString().slice(0, 10), label: new Intl.DateTimeFormat('es-PE', { timeZone: APP_TIME_ZONE, weekday: 'short' }).format(date).replace('.', '') });
   }
   return days;
 }
 
 export function BookingTrend({ appointments, range }) {
   const days = chartDays(range);
-  const counts = days.map(day => appointments.filter(item => String(item.starts_at).slice(0, 10) === day.key).length);
+  const counts = days.map(day => appointments.filter(item => limaDateKey(item.starts_at) === day.key).length);
   const max = Math.max(...counts, 1);
   const points = counts.map((count, index) => `${35 + (index * 650) / Math.max(days.length - 1, 1)},${190 - (count / max) * 145}`).join(' ');
   return <section className="mt-card mt-trend-card"><div className="mt-card-heading"><div><h2>Reservas por día</h2><p>Actividad registrada en el periodo seleccionado</p></div><span className="mt-chart-total">{counts.reduce((sum, count) => sum + count, 0)} reservas</span></div><div className="mt-chart-wrap"><svg viewBox="0 0 720 230" role="img" aria-label="Gráfico de reservas por día"><defs><linearGradient id="mt-area" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#10b8a5" stopOpacity=".25" /><stop offset="1" stopColor="#10b8a5" stopOpacity="0" /></linearGradient></defs>{[45, 93, 141, 189].map(y => <line key={y} x1="35" x2="685" y1={y} y2={y} className="mt-chart-grid" />)}<polygon points={`35,190 ${points} 685,190`} fill="url(#mt-area)" /><polyline points={points} fill="none" className="mt-chart-line" />{counts.map((count, index) => { const [x, y] = points.split(' ')[index].split(','); return <g key={days[index].key}><circle cx={x} cy={y} r="4.5" className="mt-chart-point"><title>{`${days[index].label}: ${count} reservas`}</title></circle><text x={x} y="216" textAnchor="middle" className="mt-chart-label">{days[index].label}</text></g>; })}</svg></div></section>;
