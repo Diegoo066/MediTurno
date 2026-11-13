@@ -179,7 +179,15 @@ Comprobaciones recomendadas:
 
 ## Capturas
 
-Las capturas deben generarse localmente con datos ficticios y sin mostrar correos, nombres de pacientes, cookies, tokens ni valores de `.env`. Se recomienda guardar únicamente imágenes sanitizadas en `docs/screenshots/`; esa carpeta no forma parte de la lógica de la aplicación.
+Las siguientes capturas se generaron localmente con médicos y reservas de demostración ficticias. No contienen datos de pacientes reales, secretos, cookies ni archivos `.env`:
+
+![Landing pública y médicos](docs/screenshots/01-inicio.png)
+
+![Formulario de reserva y horarios disponibles](docs/screenshots/02-reserva.png)
+
+![Panel administrativo y gráficos](docs/screenshots/03-dashboard.png)
+
+Las cifras del dashboard corresponden únicamente al conjunto de datos local disponible durante la captura; no se presentan como métricas de usuarios o negocio.
 
 No se publican estadísticas de usuarios, valoraciones, certificaciones ni métricas de negocio porque no existen datos verificables para ellas.
 
