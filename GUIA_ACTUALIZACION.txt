@@ -1,0 +1,29 @@
+MEDITURNO - VERSION CORREGIDA (12 NOV 2026)
+
+QUÉ SE CORRIGIÓ:
+- Proxy Vite dirigido a 127.0.0.1:3001 para evitar fallos localhost/IPv6.
+- DB_HOST de ejemplo 127.0.0.1 y mensaje de error de MySQL más claro.
+- /api/health verifica conexión real a MySQL.
+- frontend informa errores de backend y bloquea doble clic en Reservar.
+- schema.sql evita el error 1061 del índice duplicado en una instalación nueva.
+
+CÓMO ACTUALIZAR SIN PERDER TU BASE DE DATOS:
+1. Detén los servidores antiguos en VS Code (Ctrl+C en cada terminal).
+2. Descomprime el ZIP en una carpeta nueva (p.ej. MediTurno_Corregido).
+3. NO vuelvas a ejecutar schema.sql: tu base mediturno ya tiene 2 tablas y 3 médicos.
+4. En backend, copia .env.example y nómbralo .env. Si tu MySQL usa root sin contraseña y el puerto 3306, la plantilla ya incluye estos datos. Si usa otras credenciales, configúralas localmente.
+5. En XAMPP, inicia MySQL. Apache solo es necesario para entrar a phpMyAdmin.
+6. Desde carpeta backend: npm.cmd install  y  npm.cmd run dev.
+7. En otra terminal, desde carpeta frontend: npm.cmd install  y  npm.cmd run dev.
+8. Abre http://127.0.0.1:3001/api/health: debe decir database connected.
+9. Abre http://127.0.0.1:3001/api/doctors: deben salir 3 médicos.
+10. Abre http://127.0.0.1:5173 y prueba una reserva con datos ficticios.
+11. Revisa phpMyAdmin > mediturno > appointments > Examinar.
+
+SI /api/health DICE DISCONNECTED:
+- ECONNREFUSED: MySQL no está iniciado o el puerto no coincide.
+- ER_ACCESS_DENIED_ERROR: usuario o contraseña incorrectos.
+- ER_BAD_DB_ERROR: base 'mediturno' no encontrada en ese servidor.
+- ER_NO_SUCH_TABLE: tablas faltantes.
+
+Esta entrega contiene código corregido, pero no podemos probar la conexión a tu MySQL desde aquí. No borres bases de datos existentes ni publiques .env en GitHub.

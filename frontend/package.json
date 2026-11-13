@@ -1,0 +1,6 @@
+{
+  "name": "mediturno-web", "private": true, "version": "0.1.0", "type": "module",
+  "scripts": { "dev": "vite --host 127.0.0.1 --configLoader runner", "build": "vite build --configLoader runner", "preview": "vite preview" },
+  "dependencies": { "react": "^18.3.1", "react-dom": "^18.3.1" },
+  "devDependencies": { "vite": "^6.1.0" }
+}

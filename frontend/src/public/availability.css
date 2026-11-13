@@ -1,0 +1,4 @@
+.public-booking-form{grid-template-columns:repeat(4,1fr)}
+.public-booking-form input,.public-booking-form select{height:42px;border:1px solid #dce8e8;border-radius:7px;padding:0 11px;outline:0;color:#344f56;background:#fff;width:100%}
+.public-notice.info{color:#496d72;background:#edf6f5}
+@media(max-width:640px){.public-booking-form{grid-template-columns:1fr}}
